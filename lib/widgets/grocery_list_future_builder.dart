@@ -6,73 +6,59 @@ import 'package:grocery_snap/data/categories.dart';
 import 'package:grocery_snap/models/grocery_item.dart';
 import 'package:http/http.dart' as http;
 
-class GroceryList extends StatefulWidget {
-  const GroceryList({super.key});
+class GroceryListFutureBuilder extends StatefulWidget {
+  const GroceryListFutureBuilder({super.key});
 
   @override
-  State<GroceryList> createState() => _GroceryListState();
+  State<GroceryListFutureBuilder> createState() => _GroceryListFutureBuilderState();
 }
 
-class _GroceryListState extends State<GroceryList> {
+class _GroceryListFutureBuilderState extends State<GroceryListFutureBuilder> {
   List<GroceryItem> _groceryItems = [];
-  var _isLoading = true;
-  String? _error;
+  late Future<List<GroceryItem>> _loadedItems;
 
   @override
   void initState() {
     super.initState();
-    _loadItems();
+    _loadedItems = _loadItems();
   }
 
-  void _loadItems() async {
-    _isLoading = true;
+  Future<List<GroceryItem>> _loadItems() async {
     final url = Uri.https(
       'grocerysnap-com-default-rtdb.asia-southeast1.firebasedatabase.app',
       'shopping-list.json',
     );
-    try {
-      final response = await http.get(url);
 
-      if (response.statusCode >= 400) {
-        setState(() {
-          _error = "Failed to fetch data. Please try again later.";
-        });
-        return;
-      }
-      if (response.body == 'null') {
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-      final Map<String, dynamic> listData = json.decode(response.body);
-      final List<GroceryItem> loadedItems = [];
-      for (final item in listData.entries) {
-        final category =
-            categories.entries
-                .firstWhere(
-                  (catItem) => catItem.value.name == item.value['category'],
-                )
-                .value;
+    final response = await http.get(url);
 
-        loadedItems.add(
-          GroceryItem(
-            id: item.key,
-            name: item.value['name'],
-            quantity: item.value['quantity'],
-            category: category,
-          ),
-        );
-      }
-      setState(() {
-        _groceryItems = loadedItems;
-        _isLoading = false;
-      });
-    } catch (error) {
-      setState(() {
-        _error = "Something went wrong here. Please try again later.";
-      });
+    if (response.statusCode >= 400) {
+      throw Exception("Failed to fetch data. Please try again later.");
     }
+    if (response.body == 'null') {
+      return [];
+    }
+
+    final Map<String, dynamic> listData = json.decode(response.body);
+    final List<GroceryItem> loadedItems = [];
+    for (final item in listData.entries) {
+      final category =
+          categories.entries
+              .firstWhere(
+                (catItem) => catItem.value.name == item.value['category'],
+              )
+              .value;
+
+      loadedItems.add(
+        GroceryItem(
+          id: item.key,
+          name: item.value['name'],
+          quantity: item.value['quantity'],
+          category: category,
+        ),
+      );
+    }
+
+    return loadedItems;
   }
 
   void callAddButton() async {
@@ -90,7 +76,7 @@ class _GroceryListState extends State<GroceryList> {
 
   void _undoDelete(int index, GroceryItem item) async {
     final url = Uri.https(
-      'grocerysnap-com-default-rtdb.asia-southeast1.firebasedatabase.app',
+      'grocerysnaps-com-default-rtdb.asia-southeast1.firebasedatabase.app',
       'shopping-list.json',
     );
 
@@ -116,9 +102,9 @@ class _GroceryListState extends State<GroceryList> {
         return;
       }
       if (response.body == 'null') {
-        setState(() {
-          _isLoading = false;
-        });
+        // setState(() {
+        //   _isLoading = false;
+        // });
         return;
       }
 
@@ -126,9 +112,9 @@ class _GroceryListState extends State<GroceryList> {
         _groceryItems.insert(index, item);
       });
     } catch (error) {
-      setState(() {
-        _error = "Something went wrong here. Please try again later.";
-      });
+      // setState(() {
+      //   _error = "Something went wrong here. Please try again later.";
+      // });
     }
   }
 
@@ -175,53 +161,54 @@ class _GroceryListState extends State<GroceryList> {
         );
       }
     } catch (error) {
-      setState(() {
-        _error = "Something went wrong here. Please try again later.";
-      });
+      // setState(() {
+      //   _error = "Something went wrong here. Please try again later.";
+      // });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget content = const Center(child: Text('No items added yet.'));
-    if (_isLoading == true) {
-      content = const Center(child: CircularProgressIndicator());
-    }
-    if (_groceryItems.isNotEmpty) {
-      content = ListView.builder(
-        itemCount: _groceryItems.length,
-        itemBuilder: (context, index) {
-          return Dismissible(
-             background: Container(
-            color: Theme.of(context).colorScheme.error.withAlpha(180)
-          ),
-            onDismissed: (direction) {
-              _removeItem(_groceryItems[index]);
-            },
-            key: ValueKey(_groceryItems[index].id),
-            child: ListTile(
-              title: Text(_groceryItems[index].name),
-              leading: Container(
-                width: 24,
-                height: 24,
-                color: _groceryItems[index].category.color,
-              ),
-              trailing: Text(_groceryItems[index].quantity.toString()),
-            ),
-          );
-        },
-      );
-    }
-    if (_error != null) {
-      content = Center(child: Text(_error!));
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: Text("Your Groceries"),
         actions: [IconButton(onPressed: callAddButton, icon: Icon(Icons.add))],
       ),
-      body: content,
+      body: FutureBuilder(
+        future: _loadedItems,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text(snapshot.error.toString()));
+          }
+          if (snapshot.data!.isEmpty) {
+            return const Center(child: Text('No items added yet.'));
+          }
+
+          return ListView.builder(
+            itemCount: snapshot.data!.length,
+            itemBuilder: (context, index) {
+              return Dismissible(
+                onDismissed: (direction) {
+                  _removeItem(snapshot.data![index]);
+                },
+                key: ValueKey(snapshot.data![index].id),
+                child: ListTile(
+                  title: Text(snapshot.data![index].name),
+                  leading: Container(
+                    width: 24,
+                    height: 24,
+                    color: snapshot.data![index].category.color,
+                  ),
+                  trailing: Text(snapshot.data![index].quantity.toString()),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
