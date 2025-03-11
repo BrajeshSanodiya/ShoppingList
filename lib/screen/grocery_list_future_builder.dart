@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:grocery_snap/add_grocery.dart';
+import 'package:grocery_snap/screen/add_grocery.dart';
 import 'package:grocery_snap/data/categories.dart';
 import 'package:grocery_snap/models/grocery_item.dart';
 import 'package:http/http.dart' as http;

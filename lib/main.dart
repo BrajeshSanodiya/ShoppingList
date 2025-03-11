@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:grocery_snap/widgets/grocery_list.dart';
-import 'package:grocery_snap/widgets/grocery_list_future_builder.dart';
+import 'package:grocery_snap/screen/grocery_list.dart';
+import 'package:grocery_snap/screen/grocery_list_future_builder.dart';
 
 void main() {
   runApp(const MyApp());

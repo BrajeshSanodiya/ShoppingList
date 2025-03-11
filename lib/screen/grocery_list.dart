@@ -1,9 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:grocery_snap/add_grocery.dart';
+import 'package:grocery_snap/screen/add_grocery.dart';
 import 'package:grocery_snap/data/categories.dart';
 import 'package:grocery_snap/models/grocery_item.dart';
+import 'package:grocery_snap/screen/edit_grocery.dart';
 import 'package:http/http.dart' as http;
 
 class GroceryList extends StatefulWidget {
@@ -88,6 +89,39 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
+  void callEditButton(int itemIndex, GroceryItem editItem) async {
+    final Map<String, dynamic> updatedValue = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (ctx) => EditGrocery(
+              index: itemIndex,
+              item: editItem,
+              removeItem: _removeItem,
+            ),
+      ),
+    );
+
+    if (!updatedValue.containsKey('index') ||
+        !updatedValue.containsKey('item')) {
+      return;
+    }
+
+    final int index = updatedValue['index'];
+    final GroceryItem item = updatedValue['item'];
+    final List<GroceryItem> updatedList = [];
+    for (var i = 0; i < _groceryItems.length; i++) {
+      if (i == index) {
+        updatedList.add(item);
+      } else {
+        updatedList.add(_groceryItems[i]);
+      }
+    }
+
+    setState(() {
+      _groceryItems = updatedList;
+    });
+  }
+
   void _undoDelete(int index, GroceryItem item) async {
     final url = Uri.https(
       'grocerysnap-com-default-rtdb.asia-southeast1.firebasedatabase.app',
@@ -121,9 +155,17 @@ class _GroceryListState extends State<GroceryList> {
         });
         return;
       }
-
+      final Map<String, dynamic> resData = json.decode(response.body);
       setState(() {
-        _groceryItems.insert(index, item);
+        _groceryItems.insert(
+          index,
+          GroceryItem(
+            id: resData['name'],
+            name: item.name,
+            quantity: item.quantity,
+            category: item.category,
+          ),
+        );
       });
     } catch (error) {
       setState(() {
@@ -142,7 +184,7 @@ class _GroceryListState extends State<GroceryList> {
       'grocerysnap-com-default-rtdb.asia-southeast1.firebasedatabase.app',
       'shopping-list/${item.id}.json',
     );
-
+    print(url);
     try {
       final response = await http.delete(url);
 
@@ -188,18 +230,24 @@ class _GroceryListState extends State<GroceryList> {
       content = const Center(child: CircularProgressIndicator());
     }
     if (_groceryItems.isNotEmpty) {
-      content = ListView.builder(
+      content = ListView.separated(
         itemCount: _groceryItems.length,
+        separatorBuilder: (context, index) {
+          return Divider();
+        },
         itemBuilder: (context, index) {
           return Dismissible(
-             background: Container(
-            color: Theme.of(context).colorScheme.error.withAlpha(180)
-          ),
+            background: Container(
+              color: Theme.of(context).colorScheme.error.withAlpha(180),
+            ),
             onDismissed: (direction) {
               _removeItem(_groceryItems[index]);
             },
             key: ValueKey(_groceryItems[index].id),
             child: ListTile(
+              onTap: () {
+                callEditButton(index, _groceryItems[index]);
+              },
               title: Text(_groceryItems[index].name),
               leading: Container(
                 width: 24,
